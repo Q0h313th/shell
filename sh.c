@@ -3,12 +3,14 @@
 #include <string.h>
 #include <memory.h>
 #include <ctype.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
-#define clear() printf("\033[H\033[M")
 void main_sh_loop();
 char* sh_read_line();
 char** sh_eval_line();
 int sh_exec_line();
+int exec_and_fork();
 
 int main(){
     
@@ -161,11 +163,13 @@ char **sh_eval_line(char *ptr){
         break;
         }
     }
+    // check for improper use of quotes
     if (state == QUOTES){
         fprintf(stderr, "Error: Unterminated quotes\n");
         return NULL;
     }
-
+    
+    // the last token which has no delimiter
     if (len > start){
         size = len - start;
         if ((token = malloc(size + 1)) == NULL){ perror("malloc"); return NULL; }
@@ -182,3 +186,30 @@ char **sh_eval_line(char *ptr){
     tokens[buf_counter] = NULL;
     return tokens; 
 }
+
+int exec_and_fork(char **args){
+    int status;
+    pid_t pid = fork();
+
+    switch(pid){
+    case -1:
+        perror("fork");
+        exit(EXIT_FAILURE);
+    case 0:
+        if (execvp(args[0], args) == -1){ perror("execvp"); exit(EXIT_FAILURE); }
+        break;
+    default:
+        waitpid(pid, &status, WUNTRACED);
+    }
+    return 1;
+}
+
+
+
+
+
+
+
+
+
+
