@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <memory.h>
+#include <ctype.h>
 
 #define clear() printf("\033[H\033[M")
 void main_sh_loop();
@@ -32,11 +33,16 @@ void main_sh_loop(void){
      */
     puts("> ");
     char *line = sh_read_line();
-    printf("%s", line);
-    char **args = sh_eval_line(char *line);
+    printf("%s\n", line);
+    char **args = sh_eval_line(line);
+    for (int i = 0; args[i] != NULL; i++){
+        printf("\narg[%d] = %s\n", i, args[i]);
+    }
+    
     //int status = sh_exec_line(char **args);
 
     free(line);
+    free(args);
 }
 
 
@@ -88,11 +94,12 @@ char **sh_eval_line(char *ptr){
     typedef enum TokenCase { NORMAL, QUOTES } tokenCase;
     size_t buf_size = TOKEN_BUF_SIZE;
     size_t buf_counter = 0;
-    int idx = 0; // iterates through the characters
+    size_t idx = 0; // iterates through the characters
     char **tokens = malloc(TOKEN_BUF_SIZE * sizeof(char *)); // dont forget to free this in the main function! 
     size_t len = strlen(ptr);
-    int start = 0; // keeps track of the start of a token
+    size_t start = 0; // keeps track of the start of a token
     char *token = NULL;
+    size_t size = 0;
 
 
     if (tokens == NULL){ perror("malloc"); return NULL; }
@@ -107,17 +114,20 @@ char **sh_eval_line(char *ptr){
             if (c == '"'){
                 state = QUOTES;
                 start = idx + 1;
+                continue;
             }
             if (isspace(c)){
                 if (start == idx){
                     start = idx + 1;
                     break;
                 } 
-                size_t size = (idx) - (start); // and then make ptr[idx] = '\0'
+                size = (idx) - (start); // and then make ptr[idx] = '\0'
                 if ((token = malloc(size + 1)) == NULL){ perror("malloc"); return NULL; } // dont forget to free this!
                 ptr[idx] = '\0'; 
                 // copy a string from ptr[start] to ptr[idx];
+                if (idx < start){ fprintf(stderr, "SHENANIGANS!!!\n"); return NULL; }
                 strncpy(token, &ptr[start], size);
+                token[size] = '\0';
                 tokens[buf_counter] = token;
                 start = idx + 1;
                 buf_counter++;
@@ -129,7 +139,42 @@ char **sh_eval_line(char *ptr){
                 }
             }
         break;
+
+        case QUOTES:
+            if (c == '"' || c == '\0'){
+                size = idx - start;
+                if (idx < start){ fprintf(stderr, "SHENANIGANS!!!\n"); return NULL; }
+                if ((token = malloc(size + 1)) == NULL){ perror("malloc"); return NULL; }
+                //ptr[idx] = '\0';
+                strncpy(token, &ptr[start], size);
+                token[size] = '\0';
+                tokens[buf_counter] = token;
+                start = idx + 1;
+                buf_counter++;
+
+                if (buf_counter >= buf_size){
+                    buf_size += TOKEN_BUF_SIZE;
+                    if ((tokens = realloc(tokens, buf_size * sizeof(char *))) == NULL){ perror("realloc"); return NULL; }
+                }
+                state = NORMAL;
+            }     
+        break;
         }
     }
 
+    if (len > start){
+        size = len - start;
+        if ((token = malloc(size + 1)) == NULL){ perror("malloc"); return NULL; }
+        strncpy(token, &ptr[start], size);
+        token[size] = '\0';
+        tokens[buf_counter] = token;
+        buf_counter++;
+
+        if (buf_counter >=  buf_size){
+            buf_size += TOKEN_BUF_SIZE;
+            if ((tokens = realloc(tokens, buf_size * sizeof(char *))) == NULL){ perror("realloc"); return NULL; }
+        }
+    }
+    tokens[buf_counter] = NULL;
+    return tokens; 
 }
