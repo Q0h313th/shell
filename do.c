@@ -8,9 +8,9 @@
 void main_sh_loop();
 char* sh_read_line();
 char** sh_eval_line();
-//int sh_exec_line();
+int sh_exec_line();
 
-int main(int argc, char *argv[]){
+int main(){
     
     while(1){
         main_sh_loop();
@@ -35,11 +35,13 @@ void main_sh_loop(void){
     char *line = sh_read_line();
     printf("%s\n", line);
     char **args = sh_eval_line(line);
+    // If the string is not terminated properly
+    if (args == NULL){ return; } 
     for (int i = 0; args[i] != NULL; i++){
         printf("\narg[%d] = %s\n", i, args[i]);
     }
     
-    //int status = sh_exec_line(char **args);
+    //int status = sh_exec_line(args);
 
     free(line);
     free(args);
@@ -121,10 +123,9 @@ char **sh_eval_line(char *ptr){
                     start = idx + 1;
                     break;
                 } 
-                size = (idx) - (start); // and then make ptr[idx] = '\0'
-                if ((token = malloc(size + 1)) == NULL){ perror("malloc"); return NULL; } // dont forget to free this!
+                size = (idx) - (start); 
+                if ((token = malloc(size + 1)) == NULL){ perror("malloc"); return NULL; } 
                 ptr[idx] = '\0'; 
-                // copy a string from ptr[start] to ptr[idx];
                 if (idx < start){ fprintf(stderr, "SHENANIGANS!!!\n"); return NULL; }
                 strncpy(token, &ptr[start], size);
                 token[size] = '\0';
@@ -134,7 +135,6 @@ char **sh_eval_line(char *ptr){
 
                 if (buf_counter >= buf_size){
                     buf_size += TOKEN_BUF_SIZE;
-                    // dont forget to free this!
                     if ((tokens = realloc(tokens, buf_size * sizeof(char *))) == NULL){ perror("realloc"); return NULL; }
                 }
             }
@@ -145,7 +145,7 @@ char **sh_eval_line(char *ptr){
                 size = idx - start;
                 if (idx < start){ fprintf(stderr, "SHENANIGANS!!!\n"); return NULL; }
                 if ((token = malloc(size + 1)) == NULL){ perror("malloc"); return NULL; }
-                //ptr[idx] = '\0';
+                ptr[idx] = '\0';
                 strncpy(token, &ptr[start], size);
                 token[size] = '\0';
                 tokens[buf_counter] = token;
@@ -160,6 +160,10 @@ char **sh_eval_line(char *ptr){
             }     
         break;
         }
+    }
+    if (state == QUOTES){
+        fprintf(stderr, "Error: Unterminated quotes\n");
+        return NULL;
     }
 
     if (len > start){
