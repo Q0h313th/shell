@@ -87,7 +87,6 @@ char *sh_read_line(void){
     /* 
      * extra byte is assigned to prevent off by one error
      * the null byte is written the 1025th index
-     * learned about asan today, thanks to $(CFLAGS)
     */
     char *ptr = malloc(RL_BUFSIZE + 1);
     if  (ptr == 0){ perror("malloc"); return NULL; }
@@ -261,18 +260,3 @@ int sh_exec_line(char **args){
     }
     return fork_and_exec(args);
 } 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
