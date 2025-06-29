@@ -14,11 +14,18 @@ int fork_and_exec();
 int sh_cd(char **args);
 int sh_help();
 int sh_exit();
+int sh_history(char **args);
+
+// global history array
+#define MAX_HISTORY_LEN 100
+char *HISTORY[MAX_HISTORY_LEN];
+size_t HISTORY_COUNT = 0;
 
 char *builtin_str[] = {
     "cd",
     "help",
-    "exit"
+    "exit",
+    "history"
 };
 
 // array of function pointers that map to builtin_str
@@ -26,6 +33,7 @@ int (*builtin_func[]) (char **) = {
     &sh_cd,
     &sh_help,
     &sh_exit,
+    &sh_history
 };
 
 int num_of_builtins(void){
@@ -56,13 +64,21 @@ void main_sh_loop(void){
      * i want sh_eval_line() to return the tokens
      * i want to sh_exec_line to fork and execute the tokens
      */
+    int index = 0; // purely to track the history
     puts("\n> ");
     char *line = sh_read_line();
+   
+    index  = HISTORY_COUNT % MAX_HISTORY_LEN;
+    if (HISTORY[index]){ free(HISTORY[index]); }
+    HISTORY[index] = strdup(line);
+    HISTORY_COUNT++;
+    
     char **args = sh_eval_line(line);
-    // If the string is not terminated properly
-    if (args == NULL){ free(line); free(args); return; } 
+
+    // if args are NULL, just dont call exec_line
+    if (args == NULL){ free(line); return; }
+    
     int status = sh_exec_line(args);
-    printf("executed the instruction with status %d", status);
     for (int i = 0; args[i] != NULL; i++) {
         free(args[i]);
     }
@@ -205,6 +221,7 @@ char **sh_eval_line(char *ptr){
         }
     }
     tokens[buf_counter] = NULL;
+    if (tokens == NULL){ return NULL; }
     return tokens; 
 }
 
@@ -249,7 +266,8 @@ int sh_exit(void){
 
 int sh_exec_line(char **args){
     int i;
-    if (args[0] == NULL){
+    // check if all the args are NULL
+    if (args[0] == NULL || args == NULL){
         return 0;
     }
     
@@ -259,4 +277,29 @@ int sh_exec_line(char **args){
         }
     }
     return fork_and_exec(args);
-} 
+}
+
+int sh_history(char **args){
+    // no keyword is specified, so printout the entire history
+    int found = 0;
+    if (args[1] == NULL){
+        for (size_t i = 0; i < HISTORY_COUNT - 1 && i < MAX_HISTORY_LEN ; i++){
+            printf("%s\n", HISTORY[i]);
+        }
+        found = 1;
+    }
+    else if (args[1] != NULL){
+        char *keyword = args[1];
+        for (size_t i = 0; i < HISTORY_COUNT -1 && i < MAX_HISTORY_LEN; i++){
+            // when HISTORY[i] becomes NULL, strdup crashes
+            if (HISTORY[i] == NULL){ continue; } 
+            if (strstr(HISTORY[i], keyword)){
+                printf("%s\n", HISTORY[i]);
+            }
+        }
+        found = 1;
+    }
+    if (!found){ fprintf(stderr, "Keyword not found\n"); return 0; }
+
+    return 1;
+}
