@@ -10,13 +10,36 @@ void main_sh_loop();
 char* sh_read_line();
 char** sh_eval_line();
 int sh_exec_line();
-int exec_and_fork();
+int fork_and_exec();
+int sh_cd(char **args);
+int sh_help();
+int sh_exit();
+
+char *builtin_str[] = {
+    "cd",
+    "help",
+    "exit"
+};
+
+// array of function pointers that map to builtin_str
+int (*builtin_func[]) (char **) = {
+    &sh_cd,
+    &sh_help,
+    &sh_exit,
+};
+
+int num_of_builtins(void){
+    return sizeof(builtin_str) / sizeof(char *);
+}
+
+/* builtin function implementation starts at line 230 */
 
 int main(){
     
     while(1){
         main_sh_loop();
     }
+    
     return EXIT_SUCCESS;    
 }
 
@@ -33,20 +56,19 @@ void main_sh_loop(void){
      * i want sh_eval_line() to return the tokens
      * i want to sh_exec_line to fork and execute the tokens
      */
-    puts("> ");
+    puts("\n> ");
     char *line = sh_read_line();
-    printf("%s\n", line);
     char **args = sh_eval_line(line);
     // If the string is not terminated properly
-    if (args == NULL){ return; } 
-    for (int i = 0; args[i] != NULL; i++){
-        printf("\narg[%d] = %s\n", i, args[i]);
+    if (args == NULL){ free(line); free(args); return; } 
+    int status = sh_exec_line(args);
+    printf("executed the instruction with status %d", status);
+    for (int i = 0; args[i] != NULL; i++) {
+        free(args[i]);
     }
-    
-    //int status = sh_exec_line(args);
 
-    free(line);
     free(args);
+    free(line);
 }
 
 
@@ -187,7 +209,7 @@ char **sh_eval_line(char *ptr){
     return tokens; 
 }
 
-int exec_and_fork(char **args){
+int fork_and_exec(char **args){
     int status;
     pid_t pid = fork();
 
@@ -203,6 +225,47 @@ int exec_and_fork(char **args){
     }
     return 1;
 }
+
+int sh_cd(char **args){
+   if (args[1] == NULL){
+       fprintf(stderr, "Expected argv[1] to be name of directory\n");
+       return 0;
+   }
+   if (chdir(args[1]) != 0){ perror("chdir"); return 0; }
+   return 1;
+}
+
+int sh_help(void){
+    puts("This shell supports the following builtins:\n");
+    for (int i = 0; i < num_of_builtins(); i++){
+        printf("%s\n", builtin_str[i]);
+    }
+    puts("You may use the man command for infomation about other binaries.\n");
+    return 1;
+}
+
+int sh_exit(void){
+    exit(EXIT_SUCCESS);
+}
+
+int sh_exec_line(char **args){
+    int i;
+    if (args[0] == NULL){
+        return 0;
+    }
+    
+    for (i = 0; i < num_of_builtins(); i++){
+        if (strcmp(args[0], builtin_str[i]) == 0){
+            return (*builtin_func[i]) (args);
+        }
+    }
+    return fork_and_exec(args);
+} 
+
+
+
+
+
 
 
 
